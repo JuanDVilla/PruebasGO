@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	"io" 
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -76,17 +76,21 @@ type document_validations_arrays struct{
 	Manually_reviewed bool `json:"manually_reviewed"`
 }
 
+// FUNCION PRINCIPAL 
 func POST(w http.ResponseWriter, r *http.Request){
 	r.ParseMultipartForm(2000)
 
+	// SACAMOS LA INFORMACIÓN DE LAS IMAGENES EN LOS DATOS POST
 	file_frontal, fileInfo_frontal, err_frontal := r.FormFile("Frontal")
 	file_reverso, fileInfo_reverso, err_reverso := r.FormFile("Reverso")
 
+	// CONTROLAMOS LOS ERRORES EN EL CARGE DE LA IMAGEN, NO DEBEN ESTAR VACIAS
 	if err_frontal != nil || err_reverso != nil{
 		log.Fatal(err_frontal)
 		return
 	}
 
+	// CREAMOS UNA CARPETA Y GUARDAMOS LAS IMAGENES PARA USARLAS EN LA CARGA DEL WS
 	f_frontal,err := os.OpenFile("./Imagenes/"+fileInfo_frontal.Filename,os.O_WRONLY|os.O_CREATE, 0666)
 
 	if err != nil{
@@ -101,9 +105,10 @@ func POST(w http.ResponseWriter, r *http.Request){
 		return
 	}	
 
+	// NOS ASEGURAMOS DE CERRAR EL ARCHIVO DE LA IMAGEN
 	defer f_frontal.Close()
 	defer f_reverso.Close()
-
+	
 	io.Copy(f_frontal,file_frontal)
 	io.Copy(f_reverso,file_reverso)	
 	
@@ -125,9 +130,11 @@ func POST(w http.ResponseWriter, r *http.Request){
 	fmt.Println(frontal.Message)
 	fmt.Println(reverso.Message)
 
+	// ESPERAMOS 10 SEGUNDOS ANETES DE ENVIAR LA VALIDACIÓN INICIAL
 	time.Sleep(10000 * time.Millisecond)
 
 	for{
+		// ENVIAMOS LA PETICION AL WS DE VALIDACIÓN ESPERANDO RESPUESTA EXITOSA O FALLIDA
 		var Validacion_Final Validacion
 		Validacion_Final = validacion_final(w,r,arreglo.Validation_id)		
 		
@@ -138,6 +145,7 @@ func POST(w http.ResponseWriter, r *http.Request){
 			return
 		}	
 
+		// CUANDA YA SE HAYA TERMINADO LA VALIDACIÓN REVISAMOS QUE ES EXITOSA O NO CON LA INFORMACIÓN DE LA CEDULA
 		if Validacion_Final.Validation_status == "success" || Validacion_Final.Validation_status == "failure"{
 			if Validacion_Final.Attachment_status == "valid"{
 				http.ServeFile(w, r, "Exitoso.php")	
@@ -148,6 +156,7 @@ func POST(w http.ResponseWriter, r *http.Request){
 			}			
 		}
 
+		// ENTRE CADA SOLICITUD SERAN 10 SEGUNDOS PARA NO SATURAR EL SERVIDOR DE DATOS
 		time.Sleep(10000 * time.Millisecond)
 	}
 }
@@ -164,6 +173,7 @@ func get_validation() Validacion{
 	client := &http.Client {
 	}
 
+	// ARMAMOS LA PETICION CON LA URL Y LOS DATOS QUE SE DEBEN ENVIAR
 	req, err := http.NewRequest(method, url, payload)
 
 	if err != nil {
@@ -174,6 +184,7 @@ func get_validation() Validacion{
 	req.Header.Add("Truora-API-Key", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50X2lkIjoiIiwiYWRkaXRpb25hbF9kYXRhIjoie30iLCJjbGllbnRfaWQiOiJUQ0kzY2EzNDFjNGQ5Njc2MDQ2ZjI2ZDFmOGJkMDQyMDBjNyIsImV4cCI6MzIzMjgyMjA0MSwiZ3JhbnQiOiIiLCJpYXQiOjE2NTYwMjIwNDEsImlzcyI6Imh0dHBzOi8vY29nbml0by1pZHAudXMtZWFzdC0xLmFtYXpvbmF3cy5jb20vdXMtZWFzdC0xXzZRcXBPblF2NyIsImp0aSI6IjJjY2U1MWQ2LTkzMjctNDBiOS05YmIwLTcxYjQ1NDI0YTM1YSIsImtleV9uYW1lIjoiaW50ZWdyYXRpb25lc19wcm9jZXNvX2RlX3NlbGVjY2lvbiIsImtleV90eXBlIjoiYmFja2VuZCIsInVzZXJuYW1lIjoidHJ1b3JhbmFvcy1pbnRlZ3JhdGlvbmVzX3Byb2Nlc29fZGVfc2VsZWNjaW9uIn0.mMLrjtumE6zxBXc-M_PbGZsoMWTSp9NC-d9kv9jhkCg")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
+	// HACEMOS LA PETICIÓN REQUEST A LA API
 	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
@@ -186,6 +197,8 @@ func get_validation() Validacion{
 		log.Println(err)
 		os.Exit(1)
 	}	
+
+	// CREAMOS  EL JSON DEL RESULTADO
 
 	var arreglo Validacion
 
@@ -200,12 +213,13 @@ func get_validation() Validacion{
 
 func Subir_Imagen_API(URL string, RutaImagen string) upload_image{
 
+	// COVERTIMOS LA IMAGEN A BYTES PARA ENVIARLA COMO FILE CONTENT EL LA API
 	fileContent, err := ioutil.ReadFile(RutaImagen)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
-	// Convert []byte to string
+
 	text := string(fileContent)
 	url := URL
 	method := "PUT"
@@ -214,6 +228,8 @@ func Subir_Imagen_API(URL string, RutaImagen string) upload_image{
 
 	client := &http.Client {
 	}
+
+	// ARMAMOS LA PETICION CON LA URL Y LOS DATOS QUE SE DEBEN ENVIAR
 	req, err := http.NewRequest(method, url, payload)
 
 	if err != nil {
@@ -224,6 +240,7 @@ func Subir_Imagen_API(URL string, RutaImagen string) upload_image{
 	req.Header.Add("Truora-API-Key", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50X2lkIjoiIiwiYWRkaXRpb25hbF9kYXRhIjoie30iLCJjbGllbnRfaWQiOiJUQ0kzY2EzNDFjNGQ5Njc2MDQ2ZjI2ZDFmOGJkMDQyMDBjNyIsImV4cCI6MzIzMjgyMjA0MSwiZ3JhbnQiOiIiLCJpYXQiOjE2NTYwMjIwNDEsImlzcyI6Imh0dHBzOi8vY29nbml0by1pZHAudXMtZWFzdC0xLmFtYXpvbmF3cy5jb20vdXMtZWFzdC0xXzZRcXBPblF2NyIsImp0aSI6IjJjY2U1MWQ2LTkzMjctNDBiOS05YmIwLTcxYjQ1NDI0YTM1YSIsImtleV9uYW1lIjoiaW50ZWdyYXRpb25lc19wcm9jZXNvX2RlX3NlbGVjY2lvbiIsImtleV90eXBlIjoiYmFja2VuZCIsInVzZXJuYW1lIjoidHJ1b3JhbmFvcy1pbnRlZ3JhdGlvbmVzX3Byb2Nlc29fZGVfc2VsZWNjaW9uIn0.mMLrjtumE6zxBXc-M_PbGZsoMWTSp9NC-d9kv9jhkCg")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
+	// HACEMOS LA PETICIÓN REQUEST A LA API
 	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
@@ -236,6 +253,8 @@ func Subir_Imagen_API(URL string, RutaImagen string) upload_image{
 		log.Println(err)
 		os.Exit(1)	
 	}
+
+	// CREAMOS  EL JSON DEL RESULTADO
 
 	var arreglo upload_image
 
@@ -254,6 +273,8 @@ func validacion_final(w http.ResponseWriter, r *http.Request, validation_id stri
 
 	client := &http.Client {
 	}
+
+	// ARMAMOS LA PETICION CON LA URL Y LOS DATOS QUE SE DEBEN ENVIAR
 	req, err := http.NewRequest(method, url, nil)
 
 	if err != nil {
@@ -263,6 +284,7 @@ func validacion_final(w http.ResponseWriter, r *http.Request, validation_id stri
 	req.Header.Add("Truora-API-Key", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50X2lkIjoiIiwiYWRkaXRpb25hbF9kYXRhIjoie30iLCJjbGllbnRfaWQiOiJUQ0kzY2EzNDFjNGQ5Njc2MDQ2ZjI2ZDFmOGJkMDQyMDBjNyIsImV4cCI6MzIzMjgyMjA0MSwiZ3JhbnQiOiIiLCJpYXQiOjE2NTYwMjIwNDEsImlzcyI6Imh0dHBzOi8vY29nbml0by1pZHAudXMtZWFzdC0xLmFtYXpvbmF3cy5jb20vdXMtZWFzdC0xXzZRcXBPblF2NyIsImp0aSI6IjJjY2U1MWQ2LTkzMjctNDBiOS05YmIwLTcxYjQ1NDI0YTM1YSIsImtleV9uYW1lIjoiaW50ZWdyYXRpb25lc19wcm9jZXNvX2RlX3NlbGVjY2lvbiIsImtleV90eXBlIjoiYmFja2VuZCIsInVzZXJuYW1lIjoidHJ1b3JhbmFvcy1pbnRlZ3JhdGlvbmVzX3Byb2Nlc29fZGVfc2VsZWNjaW9uIn0.mMLrjtumE6zxBXc-M_PbGZsoMWTSp9NC-d9kv9jhkCg")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
+	// HACEMOS LA PETICIÓN REQUEST A LA API
 	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
@@ -275,7 +297,8 @@ func validacion_final(w http.ResponseWriter, r *http.Request, validation_id stri
 		log.Println(err)
 		os.Exit(1)
 	}
-	// fmt.Fprintf(w,string(response))
+
+	// CREAMOS  EL JSON DEL RESULTADO
 
 	var arreglo Validacion
 
@@ -289,7 +312,10 @@ func validacion_final(w http.ResponseWriter, r *http.Request, validation_id stri
 }
 
 func main() {
+	// CUANDO SE ENVIA EL FORMULARIO CARGA LA FUNCIÓN POST
 	http.HandleFunc("/POST", POST)
+
+	// PAGINA PRINCIPAL SE CARGA EL FORMULARIO PARA LA SUBIDA DE ARCHIVOS
 	http.HandleFunc("/Formulario", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "Formulario.php")
 	})	
